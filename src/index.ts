@@ -1,14 +1,24 @@
 import { CandleChartInterval } from 'binance-api-node';
 import { getChartAPI } from './data/binance/futures';
+import {
+  getOrderbookAPI,
+  ITradingLiteOrderBook
+} from './data/tradingLite/orderbook';
+import { BuySellPressure } from './indicators/buySellPressure';
 import { Stoch } from './indicators/stoch';
 
 const { subscribe } = getChartAPI('BTCUSDT', CandleChartInterval.ONE_HOUR);
+const { subscribe: subscribeOrderbook } = getOrderbookAPI('BTCUSDT');
 
 // all sequences will be based on the timeline
 const timeline: number[] = [];
 
+// global state
+let orderbook: ITradingLiteOrderBook | undefined;
+
 // create indicator instances here
 const indicatorStoch = new Stoch(14, 3);
+const indicatorBuySellPressure = new BuySellPressure(10);
 
 function onInitialization(
   candleOpenTime: number,
@@ -27,6 +37,7 @@ function onInitialization(
 
 function onRemoval(time: number) {
   indicatorStoch.remove(time);
+  indicatorBuySellPressure.remove(time);
 }
 
 function onUpdate(
@@ -42,6 +53,14 @@ function onUpdate(
     candleHigh,
     candleClose
   );
+  indicatorBuySellPressure.update(
+    candleOpenTime,
+    candleClose,
+    orderbook?.asks,
+    orderbook?.bids
+  );
+
+  console.log(indicatorBuySellPressure.get(timeline[timeline.length - 1]));
 }
 
 subscribe((candles) => {
@@ -93,6 +112,11 @@ subscribe((candles) => {
 
   // indicatator calculations should have concluded
   // we can run notifiers here
-  const lastTime = timeline[timeline.length - 1];
-  console.log(indicatorStoch.get(lastTime));
+  //   console.log(indicatorStoch.get(lastTime));
+});
+
+subscribeOrderbook((ob) => {
+  if (ob && ob.asks && ob.bids) {
+    orderbook = ob;
+  }
 });

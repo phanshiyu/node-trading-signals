@@ -3,7 +3,11 @@ import Binance, {
   CandleChartInterval,
   CandleChartResult
 } from 'binance-api-node';
-import { ICanBeSubscribed, SubscriberCallback } from '../../common/types';
+import {
+  DataApi,
+  ICanBeSubscribed,
+  SubscriberCallback
+} from '../../common/types';
 
 type ChartSubscriberCallback = SubscriberCallback<CandleChartResult[]>;
 
@@ -12,7 +16,7 @@ const client = Binance();
 class FuturesChart implements ICanBeSubscribed<CandleChartResult[]> {
   initialized = false;
   candles: CandleChartResult[] = [];
-  subscribers: Set<(candles: CandleChartResult[]) => void>;
+  subscribers: Set<ChartSubscriberCallback>;
   clean: () => void = () => {
     throw new Error('No clean up');
   };
@@ -83,25 +87,19 @@ class FuturesChart implements ICanBeSubscribed<CandleChartResult[]> {
       });
   }
 
-  subscribe = (callback: ChartSubscriberCallback) => {
+  subscribe = (callback: ChartSubscriberCallback): void => {
     this.subscribers.add(callback);
   };
 
-  unsubscribe = (callback: ChartSubscriberCallback) => {
+  unsubscribe = (callback: ChartSubscriberCallback): void => {
     this.subscribers.delete(callback);
   };
-}
-
-interface ChartApi {
-  subscribe: (cb: ChartSubscriberCallback) => void;
-  unsubscribe: (cb: ChartSubscriberCallback) => void;
-  clean: () => void;
 }
 
 const getChartAPI = (
   symbol: string,
   interval: CandleChartInterval
-): ChartApi => {
+): DataApi<ChartSubscriberCallback> => {
   const chart = new FuturesChart(client, symbol, interval);
 
   return {
