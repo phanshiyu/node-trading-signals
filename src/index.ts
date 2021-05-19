@@ -10,6 +10,40 @@ const timeline: number[] = [];
 // create indicator instances here
 const indicatorStoch = new Stoch(14, 3);
 
+function onInitialization(
+  candleOpenTime: number,
+  candleLow: number,
+  candleHigh: number,
+  candleClose: number
+) {
+  indicatorStoch.update(
+    timeline,
+    candleOpenTime,
+    candleLow,
+    candleHigh,
+    candleClose
+  );
+}
+
+function onRemoval(time: number) {
+  indicatorStoch.remove(time);
+}
+
+function onUpdate(
+  candleOpenTime: number,
+  candleLow: number,
+  candleHigh: number,
+  candleClose: number
+) {
+  indicatorStoch.update(
+    timeline,
+    candleOpenTime,
+    candleLow,
+    candleHigh,
+    candleClose
+  );
+}
+
 subscribe((candles) => {
   const {
     openTime: lastCandleOpenTime,
@@ -29,8 +63,7 @@ subscribe((candles) => {
       } = candles[i];
       timeline.push(candleOpenTime);
 
-      indicatorStoch.update(
-        timeline,
+      onInitialization(
         candleOpenTime,
         parseFloat(candleLow),
         parseFloat(candleHigh),
@@ -47,11 +80,10 @@ subscribe((candles) => {
       timeline.shift();
 
       // clear memory in indicator
-      indicatorStoch.remove(timeToRemove);
+      onRemoval(timeToRemove);
     }
 
-    indicatorStoch.update(
-      timeline,
+    onUpdate(
       lastCandleOpenTime,
       parseFloat(lastCandleLow),
       parseFloat(lastCandleHigh),
