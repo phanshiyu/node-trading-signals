@@ -6,6 +6,7 @@ import {
 } from './data/tradingLite/orderbook';
 import { BuySellPressure } from './indicators/buySellPressure';
 import { Stoch } from './indicators/stoch';
+import { broadcastToSubscribers } from './notifier/telegram';
 
 const { subscribe } = getChartAPI('BTCUSDT', CandleChartInterval.ONE_HOUR);
 const { subscribe: subscribeOrderbook } = getOrderbookAPI('BTCUSDT');
@@ -19,6 +20,16 @@ let orderbook: ITradingLiteOrderBook | undefined;
 // create indicator instances here
 const indicatorStoch = new Stoch(14, 3);
 const indicatorBuySellPressure = new BuySellPressure(10);
+
+// buy signals creators
+const createStochPressureBuySignal =
+  (kUpper = 20, pressureLower = 40) =>
+  (k: number | null, pressure: number | null): boolean => {
+    if (k === null || pressure === null) {
+      return false;
+    }
+    return k <= kUpper && pressure >= pressureLower;
+  };
 
 function onInitialization(
   candleOpenTime: number,
@@ -40,6 +51,8 @@ function onRemoval(time: number) {
   indicatorBuySellPressure.remove(time);
 }
 
+const stochPressureBuySignal = createStochPressureBuySignal();
+
 function onUpdate(
   candleOpenTime: number,
   candleLow: number,
@@ -59,8 +72,15 @@ function onUpdate(
     orderbook?.asks,
     orderbook?.bids
   );
+}
 
-  console.log(indicatorBuySellPressure.get(timeline[timeline.length - 1]));
+function onCandleClose(time: number) {
+  // run alerts here
+  const k = indicatorStoch.get(time);
+  const p = indicatorBuySellPressure.get(time);
+  if (stochPressureBuySignal(k, p)) {
+    broadcastToSubscribers(`BTC Buy Signal: k:${k} and pressure @ ${p}`);
+  }
 }
 
 subscribe((candles) => {
@@ -93,6 +113,7 @@ subscribe((candles) => {
     // an update or new candle
     if (lastCandleOpenTime !== timeline[timeline.length - 1]) {
       // in
+      onCandleClose(timeline[timeline.length - 1]);
       timeline.push(lastCandleOpenTime);
       // 1 out when 1 in to prevent memory overload
       const timeToRemove = timeline[0];
